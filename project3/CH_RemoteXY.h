@@ -1,7 +1,8 @@
-#include  <LiquidCrystal.h> //подключаем библиотеки
-#include  <DHT.h>
+//подключаем библиотеки
 
-#define CH_PIN_LITING  10
+#include  <LiquidCrystal.h> 
+#define CH_LCD	 		LiquidCrystal(28, 29, 24, 25, 26, 27)
+#define CH_PIN_LITING	10
 #define CH_BUTTON_NONE   0 //присваиваем постоянное значение для BUTTON_NONE 
 #define CH_BUTTON_RIGHT  1 //присваиваем постоянное значение для BUTTON_RIGHT
 #define CH_BUTTON_UP     2 //присваиваем постоянное значение для BUTTON_UP
@@ -9,9 +10,9 @@
 #define CH_BUTTON_LEFT   4 //присваиваем постоянное значение для BUTTON_LEFT
 #define CH_BUTTON_SELECT 5 //присваиваем постоянное значение для BUTTON_SELECT
 
-#define CH_DHTTYPE DHT11
-#define CH_DHTPIN 23 
-#define CH_DHT_TIMEOUT 120000 
+#include  <DHT.h>
+#define CH_DHT			DHT(23, DHT11)			
+#define CH_DHT_TIMEOUT	120000 
 
 class CH_CRemoteXY: public CRemoteXY {
  public:
@@ -19,13 +20,15 @@ class CH_CRemoteXY: public CRemoteXY {
  CH_CRemoteXY(const void * _conf, void * _var, const char * _accessPassword, HardwareSerial * _serial, long _serialSpeed, const char * _wifiSsid, const char * _wifiPassword, const char * _cloudServer, uint16_t _cloudPort, const char * _cloudToken)
  :  CRemoteXY( _conf,  _var, _accessPassword, _serial,  _serialSpeed,  _wifiSsid,  _wifiPassword, _cloudServer, _cloudPort, _cloudToken)
  {
-	lcd= new LiquidCrystal(28, 29, 24, 25, 26, 27 );
-  pinMode (CH_PIN_LITING, OUTPUT);
-  analogWrite(CH_PIN_LITING, 500);
-	lcd->begin(16, 2); //Инициализируем дисплей: 2 строки по 16 символов            
+	//Инициализируем дисплей
+	lcd= new CH_LCD ;									//: объект управления LCD
+	pinMode (CH_PIN_LITING, OUTPUT);					//: пин подсветки LCD
+	analogWrite(CH_PIN_LITING, 500);					//: подсветка 0.5 VCC
+	lcd->begin(16, 2); 									//: 2 строки по 16 символов            
 	lcd->print("INIT...");
 	button= last_button= CH_BUTTON_NONE;
-	dht= new DHT(CH_DHTPIN, CH_DHTTYPE);
+	//Инициализируем термометр
+	dht= new DHT(23, DHT11) ;
 	dhtTimeOut= millis();
 	h=t=0;
  }
