@@ -36,7 +36,7 @@ class CRemoteXY_API {
   uint32_t wireTimeOut;
   
   uint8_t moduleRunning;
- 
+    
   protected:
   virtual uint8_t initModule () {return 1;};
   virtual void handlerModule () {};
@@ -96,8 +96,6 @@ class CRemoteXY_API {
 #if defined(REMOTEXY__DEBUGLOGS)
     if (moduleRunning) {
       REMOTEXY__DEBUGLOGS.println("\r\nRemoteXY runing");
-	  REMOTEXY__DEBUGLOGS.print("getCloudState = ");
-          REMOTEXY__DEBUGLOGS.println(getCloudState ());
     }
     else {
       REMOTEXY__DEBUGLOGS.println ("\r\nModule not available, RemoteXY stoped");
@@ -403,18 +401,17 @@ class CRemoteXY_API {
   void setCloudState (uint8_t state) {
     cloudState = state;
     cloudTimeOut = millis(); 
-  
+    /*
 #if defined(REMOTEXY__DEBUGLOGS)
     REMOTEXY__DEBUGLOGS.print("\r\nNew state ");
     REMOTEXY__DEBUGLOGS.println(cloudState);
 #endif
-
+*/
   }
   
   private:
   void handlerCloud () {
     int8_t res;
-
     if (!moduleRunning) return;
     switch (cloudState) {  
       case 1:  
@@ -446,13 +443,6 @@ class CRemoteXY_API {
 #endif         
         }
         else {
-#if defined(REMOTEXY__DEBUGLOGS)
-          REMOTEXY__DEBUGLOGS.println();
-          REMOTEXY__DEBUGLOGS.print("Cloud server connection error = ");
-		  REMOTEXY__DEBUGLOGS.println(res);
-          REMOTEXY__DEBUGLOGS.println("Waiting for reconnection...");
-#endif     
-			
           setCloudState (2); 
         }
         break;

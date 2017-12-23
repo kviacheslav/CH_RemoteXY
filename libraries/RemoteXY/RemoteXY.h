@@ -1,6 +1,6 @@
 /* RemoteXY.h 
    A RemoteXY Library - Remote device control
-   version 2.3.3   
+   version 2.3.4   
    ===========================================================
    For use RemoteXY library visit website http://remotexy.com
    This website will help you use the library for configuring 
@@ -58,7 +58,7 @@
      - Fixed a bug where ESP module reboot and device did not see it;
      - Fixed a bug where the connection was filed and the device 
          did not see it and reconnection is impossible 
-   version 2.3.3    
+   version 2.3.4  
      - Fixed a bug where the length of all input variables more than 256;
      - Fixed a bug where millis() overflow in 50 days;
      - Fixed some bugs;
@@ -68,7 +68,7 @@
 #ifndef _REMOTEXY_H_
 #define _REMOTEXY_H_
 
-#define REMOTEXY__DEBUGLOGS Serial
+//#define REMOTEXY__DEBUGLOGS Serial
 #define REMOTEXY__DEBUGLOGS_SPEED 115200
 
 

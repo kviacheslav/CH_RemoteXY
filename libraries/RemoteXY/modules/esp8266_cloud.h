@@ -33,13 +33,13 @@ public:
     connectAvailable=0;
     sendBytesAvailable=0;
     sendBytesLater=0;
-	initCloud (_cloudServer, _cloudPort, _cloudToken); 
     init (_conf, _var, _accessPassword);
-     
+    initCloud (_cloudServer, _cloudPort, _cloudToken);  
+    startCloudConnection ();
   }
 
 
- 
+  protected:
   uint8_t initModule () {
     
 #if defined(REMOTEXY__DEBUGLOGS)
@@ -88,16 +88,9 @@ public:
     sendATCommand ("AT+CIPMUX=1",0);
     if (!waitATAnswer (AT_ANSWER_OK, 1000)) return 0;
     delay(100);
-    startCloudConnection ();
-#if defined(REMOTEXY__DEBUGLOGS)
-          REMOTEXY__DEBUGLOGS.println();
-          REMOTEXY__DEBUGLOGS.print("getCloudState = ");
-          REMOTEXY__DEBUGLOGS.println(getCloudState ());
-
-#endif     	
     return 1;
   }
-	protected:
+
   int8_t connectServerCloud (char * _cloudServer, uint16_t _cloudPort) {
     char sport[6];    
     rxy_itos (_cloudPort, sport);
@@ -127,6 +120,7 @@ public:
   //override AT
   void readyAT () {
     setModule ();
+    startCloudConnection ();
   }  
   
   //override AT

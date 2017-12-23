@@ -16,7 +16,8 @@ class CRemoteXY : public CRemoteXY_API {
     macAddress = (char *) _macAddress;
     init (_conf, _var, _accessPassword);
     clientState = 0;
-    initCloud (_cloudServer, _cloudPort, _cloudToken);  
+    initCloud (_cloudServer, _cloudPort, _cloudToken);
+    startCloudConnection ();  
   }
   
   uint8_t initModule () {  
@@ -38,7 +39,7 @@ class CRemoteXY : public CRemoteXY_API {
     REMOTEXY__DEBUGLOGS.println(Ethernet.localIP());
 #endif      
     delay(100);
-    startCloudConnection ();
+    
     return 1;
   }
  
