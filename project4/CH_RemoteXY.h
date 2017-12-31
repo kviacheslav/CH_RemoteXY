@@ -1,4 +1,7 @@
 //подключаем библиотеки
+#if defined(CH_GSM)
+	
+#endif //defined(CH_GSM)
 #if defined(CH_LCD)
 	#include  <LiquidCrystal.h> 
 	
@@ -13,9 +16,12 @@
 #if defined(CH_DHT)
 	#include  <DHT.h>
 	#define CH_DHT_TIMEOUT	120000 
-#endif
+#endif //defined(CH_DHT)
+#if defined(CH_CD)
 	#include <SD.h>
-	#define CD_PIN 4
+	#define CD_PIN CH_CD
+#endif //defined(CH_CD)
+
 class CH_CRemoteXY: public CRemoteXY {
  public:
  
@@ -42,8 +48,13 @@ class CH_CRemoteXY: public CRemoteXY {
 	dhtTimeOut= millis();
 	dht_h=dht_t=0;
 #endif
-	Serial3.begin(115200);
+	
+#if defined(CH_CD)
 	sd_init();
+#endif //defined(CH_CD)
+#if defined(CH_GSM)
+	gsm_init();
+#endif //defined(CH_GSM)
  }
  
 #if defined(CH_DHT)  
@@ -57,14 +68,21 @@ class CH_CRemoteXY: public CRemoteXY {
 	uint8_t button;  //вводим числовые значения для кнопок
 	uint8_t last_button;
 #endif
+#if defined(CH_CD)
 	File myFile; 
+	Sd2Card card;
+#endif //defined(CH_CD)
+#if defined(CH_GSM)
+	uint8_t gsm_state;
+	//TinyGsm modem();
+#endif //defined(CH_GSM)
   // 
   void ch_handler(){
 	int c;
-	if (Serial3.available()) {
+	/*if (Serial1.available()) {
 		//Serial.print("available - ");
 		//Serial.println(Serial.available());
-		c = Serial3.read();
+		c = Serial1.read();
 		// open the file. note that only one file can be open at a time,
 		// so you have to close this one before opening another.
 		
@@ -74,7 +92,7 @@ class CH_CRemoteXY: public CRemoteXY {
 			while (c != -1){
 				myFile.write(c);
 				Serial.write(c);
-				c = Serial3.read();
+				c = Serial1.read();
 			}
 			// close the file:
 			myFile.flush();
@@ -83,10 +101,10 @@ class CH_CRemoteXY: public CRemoteXY {
 	if (Serial.available()) {
 		c = Serial.read();
 		while (c != -1){			
-			Serial3.write(c);
+			Serial1.write(c);
 			c = Serial.read();
 		}
-	}
+	}*/
 #if defined(CH_DHT) 	
 	// Reading temperature or humidity takes about 250 milliseconds!
 	// Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
@@ -174,7 +192,7 @@ class CH_CRemoteXY: public CRemoteXY {
 	  return CH_BUTTON_NONE; //иначе, выводим значение BUTTON_NONE
 	}
 #endif //defined(CH_LCD)
-
+#if defined(CH_CD)
 void sd_init(){
 	if (myFile) {
 		Serial.print("Already to test.txt...");	
@@ -191,7 +209,7 @@ void sd_init(){
     return;
   }
   Serial.println("card initialized.");
-  /*Serial.print("\nInitializing SD card...");
+  Serial.print("\nInitializing SD card...");
 
   // we'll use the initialization code from the utility libraries
   // since we're just testing if the card is working!
@@ -219,8 +237,8 @@ void sd_init(){
       break;
     default:
       Serial.println("Unknown");
-  }*/
-   // open the file. note that only one file can be open at a time,
+  }
+  // open the file. note that only one file can be open at a time,
   // so you have to close this one before opening another.
   myFile = SD.open("test.txt", FILE_WRITE);
 
@@ -268,4 +286,33 @@ void sd_init(){
   root.ls(LS_R | LS_DATE | LS_SIZE);*/
 
 }
+#endif //defined(CH_CD)
+#if defined(CH_GSM)
+	void gsm_init(){
+		gsm_state= 0;
+		// Set GSM module baud rate
+		SerialAT.begin(115200);
+		delay(3000);
+		// Restart takes quite some time
+		// To skip it, call init() instead of restart()
+		DBG("Initializing modem...");
+		if (!modem.restart()){
+			//delay(10000);
+			return;
+		}
+		gsm_state= 1;
+		DBG("Waiting for network...");
+		if (!modem.waitForNetwork()) {
+			//delay(10000);
+			return;
+		}
+		gsm_state= 2;
+		String ussd_balance = modem.sendUSSD("*100#");
+		DBG("Balance (USSD):", ussd_balance);
+
+		String ussd_phone_num = modem.sendUSSD("*111*0887#");
+		DBG("Phone number (USSD):", ussd_phone_num);
+		
+  	};
+#endif //defined(CH_GSM)
 };

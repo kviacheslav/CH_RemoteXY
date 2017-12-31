@@ -65,7 +65,14 @@ struct {
 /////////////////////////////////////////////
 #define CH_LCD	 		LiquidCrystal(28, 29, 24, 25, 26, 27)
 #define CH_DHT DHT(22, DHT11)
-#define PIN_SWITCH_1 23
+#define CH_CD 4
+//#define CH_GSM 3
+#define PIN_PWRKEY 30 
+#include "CH_Gsm.h"
+
+
+#define PIN_SWITCH_1 23 
+
 
 #define REMOTEXY_MODULE_TIMEOUT 60000
 #define REMOTEXY_INET_TIMEOUT 120000
@@ -75,7 +82,8 @@ struct {
 uint32_t moduleTimeOut;
 uint32_t inetTimeOut;
 
-CH_CRemoteXY *ch;
+CH_CRemoteXY*	ch;
+CH_Gsm*	modem;
 //#include <SoftwareSerial.h>
  
 //SoftwareSerial SoftSerial(5, 6); // RX, TX
@@ -88,10 +96,13 @@ void setup()
 	digitalWrite(PIN_SWITCH_1, LOW);
 	
 	
+	
 	//SoftSerial.begin(115200);
 	//Serial.println("Begin...");
 	ch = new CH_CRemoteXY (RemoteXY_CONF_PROGMEM, &RemoteXY, REMOTEXY_ACCESS_PASSWORD, &REMOTEXY_SERIAL, REMOTEXY_SERIAL_SPEED, REMOTEXY_WIFI_SSID, REMOTEXY_WIFI_PASSWORD, REMOTEXY_ETHERNET_MAC, REMOTEXY_CLOUD_SERVER, REMOTEXY_CLOUD_PORT, REMOTEXY_CLOUD_TOKEN);
-  // TODO you setup code	
+	modem = new CH_Gsm(Serial3);
+	modem->pwrkeyOn();
+	// TODO you setup code	
 	inetTimeOut= moduleTimeOut= millis();
 	ch->display_state(RemoteXY.connect_flag);
 	Serial.println(memoryFree());
@@ -101,7 +112,7 @@ void loop()
 { 
 	
 
-	
+	modem->handler();
 	ch->ch_handler();
 	if (ch->getmoduleRunning()){
 		ch->handler ();		
