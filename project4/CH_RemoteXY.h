@@ -127,9 +127,10 @@ class CH_CRemoteXY: public CRemoteXY {
 			dht_t=t;			
 		}
 		dhtTimeOut= millis();
+		display_state(RemoteXY.connect_flag);
 	}	
 #endif //defined(CH_DHT) 	
-	display_state(RemoteXY.connect_flag);
+	
   }
   // if (getmoduleRunning() == 1) then module connected and working
   uint8_t getmoduleRunning()
