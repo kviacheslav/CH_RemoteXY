@@ -70,7 +70,7 @@ struct {
 //           END RemoteXY include          //
 /////////////////////////////////////////////
 //#define CH_LCD	 		LiquidCrystal(28, 29, 24, 25, 26, 27)
-#define CH_DHT DHT(A0, DHT11)
+#define CH_DHT DHT(A0, DHT22)
 //#define CH_CD 4
 //#define CH_GSM 3
 //#define PIN_PWRKEY 30
