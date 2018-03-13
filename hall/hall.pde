@@ -10,9 +10,8 @@ byte pin[] = {A0,A1,A2,A3};			// Пины, к которым подключен�
 
 // Показания, считанные с датчиков
 float sensor_reading[] = {0,0,0,0};	
-float sensor_pos[][4] = {{0,0,0,0},{0,0,0,0},{0,0,0,0},{0,0,0,0}};
-float sensor_max[] = {0,0,0,0};
-float sensor_min[] = {1000.0f,1000.0f,1000.0f,1000.0f};
+float sensor_max_pos[][4] = {{0,0,0,0},{0,0,0,0},{0,0,0,0},{0,0,0,0}};
+float sensor_min_pos[][4] = {{1000.0f,0,0,0},{0,1000.0f,0,0},{0,0,1000.0f,0},{0,0,0,1000.0f}};
 unsigned long sum[] = {0,0,0,0};
 unsigned int  cnt[] = {0,0,0,0};
 
@@ -105,71 +104,6 @@ float analogAverage(){
   }
 }
 
-void read_wind_vane(void)
-{
-	uint8_t pin;
-	float tmp = 0;
-	uint8_t max_i = 0;
-	uint8_t right_i;
-	uint8_t left_i;
-	// усредненные за время прошедшее после предыдущего чтения показания датчиков
-	//float sensor_reading[4];	
-	uint8_t cnt = 0;
-	
-	if (!wind_vane_ready){
-		apparent_wind = 90.0f;
-		return;
-	}
-    // Найдем датчик с максимальным показанием	
-	for (pin = 0; pin < 4; pin++){
-		//sensor_reading[pin] = wind_vane_sensors[pin]->read_average();
-		if (sensor_reading[pin] > sensor_max[pin])
-			sensor_max[pin] = sensor_reading[pin];
-		if (sensor_reading[pin] < sensor_min[pin])
-			sensor_min[pin] = sensor_reading[pin];	
-		if (sensor_reading[pin] > tmp){
-			max_i = pin;
-			tmp = sensor_reading[pin];			
-		}
-		if (sensor_reading[pin] == tmp)
-			cnt++;
-	}
-	// Проверим корректность показаний, чтобы небыло деления на 0
-	if (cnt == 0){
-		apparent_wind = 360.0f;
-		return;
-	}	
-    // Датчик, который левее
- 	if (left_i == 255)
-		left_i = 4 - 1;
-	// Датчик, который правее
-	right_i = max_i + 1;
-	if (right_i >= 4)
-		right_i = 0;
-
-	// Разность показаний  с левым датчиком
-	tmp = sensor_reading[max_i] - sensor_reading[left_i];
-
-	// Чувствительность датчика SS49E и его показание при нулевой магнитной индукции зависят от величины опорного напряжения.
-	// При питании от батарей опорное напряжение имеет тенженцию к уменьшению по мере разряда или при значительном увеличении потребления тока.
-	// Для определения КУ бужем использовать относительные показания.
-	// Угол отклонения от механического КУ вычисляем из пропорции разностей показаний с левым и правым датчиком
-	// Показания датчиков нестабильны даже когда флюгер стабилен.
-	
-	apparent_wind =	mechanical_relative_bearing[left_i] +	
-	((tmp  * 90.0f) / (tmp + sensor_reading[max_i] - sensor_reading[right_i]));
-	if ( apparent_wind >= 360.0f )
-		apparent_wind -= 360.0f;
-	r_b = apparent_wind + 0.5;	
-	/*
-	relative_bearing =
-	mechanical_relative_bearing[left_i] +
-	((tmp  * sensors_angle) / (tmp + sensor_reading[max_i] - sensor_reading[right_i]));
- if ( relative_bearing >= 360.0f )
-   relative_bearing = relative_bearing - 360.0f;
-   r_b = relative_bearing + 0.5;
-   apparent_wind = relative_bearing;*/
-}
 
 /*
 Вычисляет курсовой угол
@@ -177,30 +111,37 @@ void read_wind_vane(void)
 void relativeBearing(){
  byte i; 
  byte j;
- unsigned long tmp = 0;
+ float tmp = 0;
  byte max_i;
  byte right_i;
  byte left_i;
  
- // Найдем датчик с максимальным показанием
+
  for ( i = 0; i < q; i ++){
-	if (sensor_reading[i] > sensor_max[i]){
-		sensor_max[i] = sensor_reading[i];
+	// Запомним максимальное показание датчика и показания других датчиков в этот момент 
+	if (sensor_reading[i] > sensor_max_pos[i][i]){
 		for( j = 0; j < q; j++)
-			sensor_pos[i][j] = sensor_reading[j];			
+			sensor_max_pos[i][j] = sensor_reading[j];	
+	
 	}
-	if (sensor_reading[i] < sensor_min[i])
-			sensor_min[i] = sensor_reading[i];
+	
+	// Запомним минимальное показание датчика и показания других датчиков в этот момент 
+	if (sensor_reading[i] < sensor_min_pos[i][i]){
+		for( j = 0; j < q; j++)
+			sensor_min_pos[i][j] = sensor_reading[j];		
+	}	
+		
+	// Определим датчик с максимальным текущим показанием
 	if (sensor_reading[i] > tmp){
 		max_i = i;
 		tmp = sensor_reading[i];
 	}
  }
- // Датчик, который левее
+ // Датчик слева
  left_i = max_i - 1; 
  if (left_i == 255)
    left_i = q - 1;
- // Датчик, который правее 
+ // Датчик справа
  right_i = max_i + 1;
  if (right_i >= q)
    right_i = 0;
@@ -224,16 +165,16 @@ void relativeBearing(){
   
   // апроксимация exp(-x^2)  
   costs_exp2 = micros();
-  if ((sensor_reading[right_i]- sensor_pos[max_i][right_i]) > (sensor_reading[left_i]-sensor_pos[max_i][left_i])){
+  if ((sensor_reading[right_i] - sensor_max_pos[max_i][right_i]) > (sensor_reading[left_i] - sensor_max_pos[max_i][left_i])){
 		pair = right_i;
   }
   else{
 		pair = left_i;
   }
-  tmp = sensor_reading[max_i]-sensor_min[max_i];
+  tmp = sensor_reading[max_i]-sensor_min_pos[max_i][max_i];
   if (tmp > 0){ // прошли колибровку ?
 	r_b_exp2 = squaref(
-		-logf(tmp/(sensor_pos[max_i][max_i]-sensor_min[max_i]))
+		-logf(tmp/(sensor_max_pos[max_i][max_i] - sensor_min_pos[max_i][max_i]))
 	)*155;
 	r_exp2 = r_b_exp2 + 0.5;
 	if (pair == right_i)
@@ -251,15 +192,15 @@ void relativeBearing(){
   
   // апроксимация exp(-x)  
   costs_exp1 = micros();
-  if ((sensor_reading[right_i]- sensor_pos[max_i][right_i]) > (sensor_reading[left_i]-sensor_pos[max_i][left_i])){
+  if ((sensor_reading[right_i] - sensor_max_pos[max_i][right_i]) > (sensor_reading[left_i] - sensor_max_pos[max_i][left_i])){
 		pair = right_i;
   }
   else{
 		pair = left_i;
   }
-  tmp = sensor_reading[max_i] - sensor_min[max_i];//sensor_pos[pair][max_i];
+  tmp = sensor_reading[max_i] - sensor_min_pos[max_i][max_i];
   if (tmp > 0){ // прошли колибровку ?
-	r_b_exp1 = 	-logf(tmp/(sensor_pos[max_i][max_i]-sensor_min[max_i])) * 77;	
+	r_b_exp1 = 	-logf(tmp/(sensor_max_pos[max_i][max_i] - sensor_min_pos[max_i][max_i])) * 77;	
 	r_exp1 = r_b_exp1 + 0.5;
 	if (pair == right_i)
 		r_b_exp1 = mechanical__bearing[max_i] + r_b_exp1;
@@ -274,19 +215,19 @@ void relativeBearing(){
   }
   costs_exp1 = micros() - costs_exp1;
   
-  // апроксимация линейная  
+  // апроксимация пропорциональная  
   costs_line = micros();
-  if ((sensor_reading[right_i]- sensor_min[right_i]) > (sensor_reading[left_i]-sensor_min[left_i])){
+  if ((sensor_reading[right_i]- sensor_max_pos[max_i][right_i]) > (sensor_reading[left_i]-sensor_max_pos[max_i][left_i])){
 		pair = right_i;
   }
   else{
 		pair = left_i;
   }
-  //tmp = (sensor_reading[max_i]-sensor_pos[pair][max_i]);
-  tmp = sensor_pos[max_i][max_i] - sensor_reading[max_i];
+ 
+  tmp = sensor_max_pos[max_i][max_i] - sensor_reading[max_i];
   if (tmp >= 0){ // прошли колибровку ?
-	r_b_line = 	90 * (tmp/(tmp + sensor_pos[pair][pair] - sensor_reading[pair]));
-	//( 1 - tmp/(sensor_pos[max_i][max_i]-sensor_pos[pair][max_i])) * 90;	
+	r_b_line = 	90 * (tmp/(tmp + sensor_max_pos[pair][pair] - sensor_reading[pair]));
+	
 	r_line = r_b_line + 0.5;
 	if (pair == right_i)
 		r_b_line = mechanical__bearing[max_i] + r_b_line;
@@ -373,18 +314,22 @@ void sensors(){
 	  Serial.print(" t"); Serial.print(i);Serial.print(": ");
 	  Serial.print(sensor_reading[i]);
 	}
-	Serial.println("");
-	Serial.print(" Min : ");
-	for(i = 0; i < q; i++){
-	  Serial.print(" t"); Serial.print(i);Serial.print(": ");
-	  Serial.print(sensor_min[i]);
-	}
+	
 	for(j = 0; j < q; j++){
 		Serial.println("");
-		Serial.print(" Pos"); Serial.print(j);Serial.print(": ");
+		Serial.print(" MinPos : ");
 		for(i = 0; i < q; i++){
 		  Serial.print(" t"); Serial.print(i);Serial.print(": ");
-		  Serial.print(sensor_pos[j][i]);
+		  Serial.print(sensor_min_pos[j][i]);
+		}
+	}
+	
+	for(j = 0; j < q; j++){
+		Serial.println("");
+		Serial.print(" MaxPos"); Serial.print(j);Serial.print(": ");
+		for(i = 0; i < q; i++){
+		  Serial.print(" t"); Serial.print(i);Serial.print(": ");
+		  Serial.print(sensor_max_pos[j][i]);
 		}
 	}
 	Serial.println("");
