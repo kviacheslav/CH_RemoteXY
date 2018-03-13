@@ -25,11 +25,11 @@ float sensors_angle = 90.0f;
 float relative_bearing; 			// Вычесленный (текущий) КУ 
 
 float r_b_exp2;
-float r_exp2 = 0;
+uint16_t r_exp2 = 0;
 float r_b_exp1;
-float r_exp1 = 0;
+uint16_t r_exp1 = 0;
 float r_b_line;
-float r_line = 0;
+uint16_t r_line = 0;
 
 float apparent_wind;
 bool wind_vane_ready = false;
@@ -41,6 +41,7 @@ uint32_t costs_exp2;
 uint32_t costs_exp1;
 uint32_t costs_line;
 uint32_t costs0;
+byte pair;
 
 void setup() {
   // initialize serial communication at 9600 bits per second:
@@ -180,6 +181,7 @@ void relativeBearing(){
  byte max_i;
  byte right_i;
  byte left_i;
+ 
  // Найдем датчик с максимальным показанием
  for ( i = 0; i < q; i ++){
 	if (sensor_reading[i] > sensor_max[i]){
@@ -222,13 +224,19 @@ void relativeBearing(){
   
   // апроксимация exp(-x^2)  
   costs_exp2 = micros();
+  if ((sensor_reading[right_i]- sensor_pos[max_i][right_i]) > (sensor_reading[left_i]-sensor_pos[max_i][left_i])){
+		pair = right_i;
+  }
+  else{
+		pair = left_i;
+  }
   tmp = sensor_reading[max_i]-sensor_min[max_i];
   if (tmp > 0){ // прошли колибровку ?
 	r_b_exp2 = squaref(
 		-logf(tmp/(sensor_pos[max_i][max_i]-sensor_min[max_i]))
-	)*45;
+	)*155;
 	r_exp2 = r_b_exp2 + 0.5;
-	if ((sensor_reading[right_i]- sensor_pos[max_i][right_i]) > (sensor_reading[left_i]-sensor_pos[max_i][left_i]))
+	if (pair == right_i)
 		r_b_exp2 = mechanical__bearing[max_i] + r_b_exp2;
 	else{
 		r_b_exp2 = mechanical__bearing[max_i] - r_b_exp2;
@@ -243,11 +251,17 @@ void relativeBearing(){
   
   // апроксимация exp(-x)  
   costs_exp1 = micros();
-  tmp = (sensor_reading[max_i]-sensor_min[max_i]);
+  if ((sensor_reading[right_i]- sensor_pos[max_i][right_i]) > (sensor_reading[left_i]-sensor_pos[max_i][left_i])){
+		pair = right_i;
+  }
+  else{
+		pair = left_i;
+  }
+  tmp = sensor_reading[max_i] - sensor_min[max_i];//sensor_pos[pair][max_i];
   if (tmp > 0){ // прошли колибровку ?
-	r_b_exp1 = 	-logf(tmp/(sensor_pos[max_i][max_i]-sensor_min[max_i])) * 18;	
+	r_b_exp1 = 	-logf(tmp/(sensor_pos[max_i][max_i]-sensor_min[max_i])) * 77;	
 	r_exp1 = r_b_exp1 + 0.5;
-	if ((sensor_reading[right_i]- sensor_pos[max_i][right_i]) > (sensor_reading[left_i]-sensor_pos[max_i][left_i]))
+	if (pair == right_i)
 		r_b_exp1 = mechanical__bearing[max_i] + r_b_exp1;
 	else{
 		r_b_exp1 = mechanical__bearing[max_i] - r_b_exp1;
@@ -262,11 +276,19 @@ void relativeBearing(){
   
   // апроксимация линейная  
   costs_line = micros();
-  tmp = (sensor_reading[max_i]-sensor_min[max_i]);
-  if (tmp > 0){ // прошли колибровку ?
-	r_b_line = 	( 1 - tmp/(sensor_pos[max_i][max_i]-sensor_min[max_i])) * 90;	
+  if ((sensor_reading[right_i]- sensor_min[right_i]) > (sensor_reading[left_i]-sensor_min[left_i])){
+		pair = right_i;
+  }
+  else{
+		pair = left_i;
+  }
+  //tmp = (sensor_reading[max_i]-sensor_pos[pair][max_i]);
+  tmp = sensor_pos[max_i][max_i] - sensor_reading[max_i];
+  if (tmp >= 0){ // прошли колибровку ?
+	r_b_line = 	90 * (tmp/(tmp + sensor_pos[pair][pair] - sensor_reading[pair]));
+	//( 1 - tmp/(sensor_pos[max_i][max_i]-sensor_pos[pair][max_i])) * 90;	
 	r_line = r_b_line + 0.5;
-	if ((sensor_reading[right_i]- sensor_pos[max_i][right_i]) > (sensor_reading[left_i]-sensor_pos[max_i][left_i]))
+	if (pair == right_i)
 		r_b_line = mechanical__bearing[max_i] + r_b_line;
 	else{
 		r_b_line = mechanical__bearing[max_i] - r_b_line;
@@ -333,7 +355,7 @@ void sensors(){
 	byte i;
 	byte j;
 	Serial.print("r_b0: ");
-	Serial.print(apparent_wind);Serial.print(" / / ");Serial.print(costs0);
+	Serial.print(apparent_wind);Serial.print(" / ");Serial.print(pair);Serial.print(" / ");Serial.print(costs0);
 	Serial.println("");
 	Serial.print("exp2: ");
 	Serial.print(r_b_exp2);Serial.print(" / ");Serial.print(r_exp2);Serial.print(" / ");Serial.print(costs_exp2);
