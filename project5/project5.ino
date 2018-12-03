@@ -94,7 +94,8 @@ void setup()
    power_on = EEPROM.read(2);
    RemoteXY.T_min = set_tem;
    RemoteXY.switch_1 = power_on;
-   power(false);
+   
+   power(-1);
      
 }
 
@@ -116,48 +117,49 @@ void loop()
     EEPROM.write(1, (set_tem-(int)set_tem)*10);   
     EEPROM.commit();
   }
-  if (isnan(tem)){
-    tem = -50;
-  }
-  else
-  {
-    power(RemoteXY.T_min > tem);
-  }
-  RemoteXY.level_T = tem + 50;
-
-  if (isnan(hum)){
-    hum = 0;
-  }
-  RemoteXY.level_H = hum;
   
   if ((millis() - dhtTimeOut) > 10000){
 	  hum = dht.readHumidity();
+	  RemoteXY.level_H = (isnan(hum))? 0 : hum;
+		
 	  tem = dht.readTemperature();
+	  RemoteXY.level_T = (isnan(tem))? 0 : tem + 50;
+	  
 	  if (isnan(hum) || isnan(tem)) 
 	  {
-		  REMOTEXY__DEBUGLOGS.println("Failed to read from DHT sensor!");
+		RemoteXY.level_H = 0;
+		RemoteXY.level_T = 0;
+		power(-1);
+		
+		REMOTEXY__DEBUGLOGS.println("Failed to read from DHT sensor!");
 	  }
 	  else
 	  {
+		RemoteXY.level_H = hum;
+		RemoteXY.level_T = tem + 50;
+		power(RemoteXY.T_min - tem);
+		
   		REMOTEXY__DEBUGLOGS.print("Temperature: ");
   		REMOTEXY__DEBUGLOGS.print(tem);
   		REMOTEXY__DEBUGLOGS.print(" Humidity: ");
-  		REMOTEXY__DEBUGLOGS.print(hum);
-  		REMOTEXY__DEBUGLOGS.println("Sending data ready");    
+  		REMOTEXY__DEBUGLOGS.println(hum);
+  		  
 	  }
 	  dhtTimeOut= millis();	  
   }  
-	
+  	
 }
 
-void power(bool on){
-  if (!on || RemoteXY.switch_1 == 0){
+void power(float diff){
+  if (diff < 0 || RemoteXY.switch_1 == 0){
     digitalWrite(PIN_SWITCH_1, LOW);
     RemoteXY.led_1_r = 0;
+	REMOTEXY__DEBUGLOGS.println("Power off.");
   }
-  if (on && RemoteXY.switch_1 != 0){
+  if (diff > 0 && RemoteXY.switch_1 != 0){
     digitalWrite(PIN_SWITCH_1, HIGH);
     RemoteXY.led_1_r = 128;
+	REMOTEXY__DEBUGLOGS.println("Power on!");
   }  
 }
 
