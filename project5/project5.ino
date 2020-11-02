@@ -65,16 +65,39 @@ struct {
 /////////////////////////////////////////////
 //           END RemoteXY include          //
 /////////////////////////////////////////////
-#define PIN_SWITCH_1 5 // D1
-
+#define PIN_SWITCH_1 D8
+#define PIN_DIOD D0
+#include <SPI.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include "Adafruit_SSD1306.h"
 #include <EEPROM.h>
 #include <DHT.h>
-DHT dht(2, DHT22);
+DHT dht(D4, DHT21); // 2
+DHT dht7(D7, DHT22); // 2
+DHT dht6(D6, DHT22); // 2
+DHT dht5(D5, DHT22); // 2
+
+#define OLED_RESET -1
+Adafruit_SSD1306 display(OLED_RESET);
+
 uint32_t dhtTimeOut;
+uint32_t diodTimeOut;
+uint32_t diodBlinkOn;
+uint32_t diodBlinkOff;
 float tem;
 float hum;
+float tem5;
+float hum5;
+float tem6;
+float hum6;
+float tem7;
+float hum7;
 float set_tem;
 uint8_t power_on;
+boolean relay = false; //  - off true - on
+boolean light = true;
+
 
 void setup() 
 {
@@ -82,25 +105,36 @@ void setup()
   RemoteXY_Init (); 
   
   pinMode (PIN_SWITCH_1, OUTPUT);
+  pinMode(PIN_DIOD, OUTPUT);   
   
   // TODO you setup code
+   dht5.begin();
+   dht6.begin();
+   dht7.begin();
    dht.begin(); 
    hum = dht.readHumidity();
    tem = dht.readTemperature();   
-   dhtTimeOut= millis();
-
+   dhtTimeOut = millis();
+   
    EEPROM.begin(4);
    set_tem = EEPROM.read(0) + EEPROM.read(1)/10;
    power_on = EEPROM.read(2);
    RemoteXY.T_min = set_tem;
    RemoteXY.switch_1 = power_on;
+
+   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+   display.display();
    
-   power(-1);
+   relay = power(-1);
+   
+   diodBlinkOn = 0; // 0 раз в секунду
+   light = false;
      
 }
 
 void loop() 
 { 
+  
   RemoteXY_Handler ();
   
   
@@ -118,48 +152,119 @@ void loop()
     EEPROM.commit();
   }
   
-  if ((millis() - dhtTimeOut) > 10000){
+  if ((millis() - dhtTimeOut) > 20000){
 	  hum = dht.readHumidity();
 	  RemoteXY.level_H = (isnan(hum))? 0 : hum;
 		
 	  tem = dht.readTemperature();
 	  RemoteXY.level_T = (isnan(tem))? 0 : tem + 50;
-	  
-	  if (isnan(hum) || isnan(tem)) 
+    
+    hum5 = dht5.readHumidity();    
+    tem5 = dht5.readTemperature();    
+    REMOTEXY__DEBUGLOGS.println("");
+    REMOTEXY__DEBUGLOGS.print("Temp5: ");
+    REMOTEXY__DEBUGLOGS.print((isnan(tem5))? 0 : tem5,1);
+    REMOTEXY__DEBUGLOGS.print(" Hum5: ");
+    REMOTEXY__DEBUGLOGS.println((isnan(hum5))? 0 : hum5,1);
+
+    hum6 = dht6.readHumidity();    
+    tem6 = dht6.readTemperature();    
+    REMOTEXY__DEBUGLOGS.print("Temp6: ");
+    REMOTEXY__DEBUGLOGS.print((isnan(tem6))? 0 : tem6,1);
+    REMOTEXY__DEBUGLOGS.print(" Hum6: ");
+    REMOTEXY__DEBUGLOGS.println((isnan(hum6))? 0 : hum6,1);
+
+    hum7 = dht7.readHumidity();    
+    tem7 = dht7.readTemperature();    
+    REMOTEXY__DEBUGLOGS.print("Temp7: ");
+    REMOTEXY__DEBUGLOGS.print((isnan(tem7))? 0 : tem7,1);
+    REMOTEXY__DEBUGLOGS.print(" Hum7: ");
+    REMOTEXY__DEBUGLOGS.println((isnan(hum7))? 0 : hum7,1);
+    
+	  if (isnan(hum) && isnan(tem)) 
 	  {
-		RemoteXY.level_H = 0;
-		RemoteXY.level_T = 0;
-		power(-1);
-		
-		REMOTEXY__DEBUGLOGS.println("Failed to read from DHT sensor!");
+		  RemoteXY.level_H = 0;
+		  RemoteXY.level_T = 0;
+		  diodTimeOut = millis();
+		  if (relay){
+        diodBlinkOn = 1000;
+        diodBlinkOff = 250;
+		  }
+      else{
+        diodBlinkOn = 100;
+        diodBlinkOff = 2000;
+      }    
+        
+		  display.clearDisplay();
+      display.setCursor(0,0);
+      display.println("DHT21");
+      display.println("error");
+      display.display();
+		  REMOTEXY__DEBUGLOGS.println("Failed to read from DHT sensor!");
 	  }
 	  else
 	  {
-		RemoteXY.level_H = hum;
-		RemoteXY.level_T = tem + 50;
-		power(RemoteXY.T_min - tem);
-		
+	    RemoteXY.level_H = hum;
+		  RemoteXY.level_T = tem + 50;
+      diodBlinkOn = 0;  
+		  relay = power(RemoteXY.T_min - tem);
+
+      display.clearDisplay();
+      display.setTextSize(2);
+      display.setTextColor(WHITE);
+      display.setCursor(0,0);
+      // Temperature in Celcius
+      //display.println("Temp.");
+      display.println(tem);
+      //display.println(" c");
+      // Humidity in % 
+      //display.println("Humidity");
+      display.println(hum);
+      //display.println(" %");
+      if (relay)
+        display.println("On!");
+      else
+        display.println("Off");
+      display.display();
+		  
   		REMOTEXY__DEBUGLOGS.print("Temperature: ");
-  		REMOTEXY__DEBUGLOGS.print(tem);
+  		REMOTEXY__DEBUGLOGS.print(tem,1);
   		REMOTEXY__DEBUGLOGS.print(" Humidity: ");
-  		REMOTEXY__DEBUGLOGS.println(hum);
+  		REMOTEXY__DEBUGLOGS.println(hum,1);
   		  
 	  }
 	  dhtTimeOut= millis();	  
-  }  
+  }
+  if (diodBlinkOn > 0){
+    if ((millis() - diodTimeOut) > ((light)? diodBlinkOn : diodBlinkOff)){
+        light = !light;
+        digitalWrite(PIN_DIOD, light);
+        diodTimeOut = millis();
+        
+    }
+          
+  } 
+  
   	
 }
 
-void power(float diff){
+boolean power(float diff){
+  int result;
   if (diff < 0 || RemoteXY.switch_1 == 0){
     digitalWrite(PIN_SWITCH_1, LOW);
+    light = false;
+    digitalWrite(PIN_DIOD, light);
     RemoteXY.led_1_r = 0;
+    result = false;
 	REMOTEXY__DEBUGLOGS.println("Power off.");
   }
   if (diff > 0 && RemoteXY.switch_1 != 0){
     digitalWrite(PIN_SWITCH_1, HIGH);
+    light = true;
+    digitalWrite(PIN_DIOD, light);
     RemoteXY.led_1_r = 128;
+    result = true;
 	REMOTEXY__DEBUGLOGS.println("Power on!");
   }  
+  return result;  
 }
-
