@@ -115,7 +115,7 @@ void setup()
   RemoteXY_Init (); 
 
   // TODO you setup code
-   pinMode(PIN_BUTTON, INPUT_PULLUP);
+   pinMode(PIN_BUTTON, INPUT);
    pinMode (PIN_SWITCH_1, OUTPUT);
    pinMode(PIN_DIOD, OUTPUT);  
   
