@@ -69,16 +69,16 @@ struct {
 /////////////////////////////////////////////
 //           END RemoteXY include          //
 /////////////////////////////////////////////
-#define PIN_SWITCH_1 D8
+#define PIN_SWITCH_1 D6 // relay
 #define PIN_DIOD D0
-#define PIN_BUTTON D6
+#define PIN_BUTTON D8
 #include <SPI.h>
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include "Adafruit_SSD1306.h"
 #include <EEPROM.h>
 #include <DHT.h>
-DHT dht(D4, DHT21); // 2
+DHT dht(D5, DHT21); // 2
 
 #define OLED_RESET -1
 Adafruit_SSD1306 display(OLED_RESET);

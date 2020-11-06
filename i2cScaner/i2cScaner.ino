@@ -3,7 +3,7 @@
 void setup(){
     Wire.begin();
  
-    Serial.begin(9600);
+    Serial.begin(74880 /* совместимость с Wemos D1 */);
     while (!Serial);
     Serial.println("\nI2C Scanner");
 } 
