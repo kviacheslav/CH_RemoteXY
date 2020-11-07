@@ -34,23 +34,32 @@
 #define REMOTEXY_CLOUD_PORT 6376
 #define REMOTEXY_CLOUD_TOKEN "2042b321e1648a82eb2be11e1436674e" //"2042b321e1648a82eb2be11e1436674e"
 
-
 // конфигурация интерфейса  
 #pragma pack(push, 1)
 uint8_t RemoteXY_CONF[] =
-  { 255,0,0,14,0,34,0,10,5,1,
-  66,132,25,17,13,10,2,24,130,2,
-  7,33,50,13,17,67,5,10,35,44,
-  8,2,28,11,69,0,28,55,10,10,
-  1 };
+   { 255,5,0,45,0,67,0,10,13,1,
+  66,132,19,16,29,23,2,24,2,0,
+  21,56,24,13,2,26,31,31,79,78,
+  0,79,70,70,0,7,44,21,44,23,
+  7,2,26,2,2,65,36,6,22,13,
+  13,66,0,49,18,9,21,2,26,67,
+  5,3,92,57,4,2,26,41,65,34,
+  31,28,5,5 };
   
 // структура определяет все переменные и события вашего интерфейса управления 
 struct {
 
+   
+    // input variables
+  uint8_t switch_1; // =1 если переключатель включен и =0 если отключен 
+  float T_min;
+
     // output variables
-  int8_t level_1; // =0..100 положение уровня 
-  char text_1[11];  // =строка UTF8 оканчивающаяся нулем 
-  int16_t sound_1; // =0 нет звука, иначе ID звука, для примера 1001, смотри список звуков в приложении 
+  int8_t level_T; // =0..100 положение уровня 
+  uint8_t led_1_r; // =0..255 яркость красного цвета индикатора 
+  int8_t level_H; // =0..100 положение уровня 
+  char text_1[41];  // =строка UTF8 оканчивающаяся нулем 
+  uint8_t led_2_g; // =0..255 яркость зеленого цвета индикатора 
 
     // other variable
   uint8_t connect_flag;  // =1 if wire connected, else =0 
@@ -78,9 +87,23 @@ RtcDS3231<TwoWire> Rtc(Wire);
 #include <DHT.h>
 DHT dht(D5, DHT22); //
 
-int show = -1; 
+#define PIN_RELAY D6 // relay
+#define PIN_DIOD D0
+#define PIN_BUTTON D8 // pull down on Wemos D1
+
 float tem;
 float hum;
+float set_tem;
+int tem_last;
+int hum_last;
+uint8_t power_on;
+uint8_t display_show = 1; // display time and temperatur
+boolean relay = false;    // relay off, true - on
+boolean light = true;     // diod lighting, false - pause
+boolean button = false;   // true - button press
+uint32_t dhtTimeOut;
+uint32_t rtcTimeOut;
+uint32_t displayTimeOut;
 
 void setup() 
 {
@@ -88,28 +111,47 @@ void setup()
   RemoteXY_Init ();   
   
   // TODO you setup code
+  rtcTimeOut = dhtTimeOut = displayTimeOut = millis();
   
-  dht.begin(); 
+  //--------PIN SETUP ------------
+  pinMode(PIN_BUTTON, INPUT);
+  pinMode (PIN_RELAY, OUTPUT);
+  pinMode(PIN_DIOD, OUTPUT);
+  
+  //--------EEPROM SETUP ------------
+  EEPROM.begin(4);
+  set_tem = EEPROM.read(0)*10 + EEPROM.read(1);
+  set_tem /= 10;
+  power_on = EEPROM.read(2);
+  RemoteXY.T_min = set_tem;
+  RemoteXY.switch_1 = power_on;
+
+  //--------DHT SETUP ------------  
+  dht.begin();
+  hum = dht.readHumidity();
+  tem = dht.readTemperature();
+  if (isnan(hum) && isnan(tem)){
+      hum_last = 0;
+      tem_last = 0;
+      RemoteXY.led_2_g = 0;
+  } else {
+      hum_last = round(hum);
+      tem_last = round(tem);
+      RemoteXY.led_2_g = 128;
+  }
+  RemoteXY.level_H = hum_last;
+  RemoteXY.level_T = tem_last + 50;
+     
   
  // RemoteXY.sound_1 = 0;
- // See http://playground.arduino.cc/Main/I2cScanner how to test for a I2C device.
- /* Wire.begin();
-  Wire.beginTransmission(0x27);
-  error = Wire.endTransmission();
-  REMOTEXY__DEBUGLOGS.print("Error: ");
-  REMOTEXY__DEBUGLOGS.print(error);*/
- error = 0;
- REMOTEXY__DEBUGLOGS.println("");
-  if (error == 0) {
-    REMOTEXY__DEBUGLOGS.println(": LCD found.");
-    display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
-    display.display();
-    delay(1000);  
-    display.setTextSize(2);
-    display.setTextColor(WHITE);
-  } else {
-    REMOTEXY__DEBUGLOGS.println(": LCD not found.");
-  } // if
+   REMOTEXY__DEBUGLOGS.println("");
+   //--------Display SETUP ------------
+   // See http://playground.arduino.cc/Main/I2cScanner how to test for a I2C device.
+   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+   display.display();
+   display.setTextSize(2);
+   display.setTextColor(WHITE);
+ 
 
     REMOTEXY__DEBUGLOGS.print("compiled: ");
     REMOTEXY__DEBUGLOGS.print(__DATE__);
@@ -182,78 +224,103 @@ void setup()
 
 void loop() 
 { 
-  //RemoteXY_Handler ();
-  if (RemoteXY_isConnected() == 1)
-    RemoteXY.sound_1 = 1002;
+  RemoteXY_Handler ();
+  //if (RemoteXY_isConnected() == 1)
+    //RemoteXY.sound_1 = 1002;
   
   // TODO you loop code
   // используйте структуру RemoteXY для передачи данных
   // не используйте функцию delay() 
-  hum = dht.readHumidity();    
-  tem = dht.readTemperature();
-  if (isnan(hum) && isnan(tem)) {
-      REMOTEXY__DEBUGLOGS.println("DHT failed");
-  } else {
-      REMOTEXY__DEBUGLOGS.print("Temperature: ");
-      REMOTEXY__DEBUGLOGS.print(tem,1);
-      REMOTEXY__DEBUGLOGS.print(" Humidity: ");
-      REMOTEXY__DEBUGLOGS.println(hum,1);        
-  }
-     
-  if (!Rtc.IsDateTimeValid()) 
-    {
-        if (Rtc.LastError() != 0)
-        {
-            // we have a communications error
-            // see https://www.arduino.cc/en/Reference/WireEndTransmission for 
-            // what the number means
-            REMOTEXY__DEBUGLOGS.print("RTC communications error = ");
-            REMOTEXY__DEBUGLOGS.println(Rtc.LastError());
-        }
-        else
-        {
-            // Common Causes:
-            //    1) the battery on the device is low or even missing and the power line was disconnected
-            REMOTEXY__DEBUGLOGS.println("RTC lost confidence in the DateTime!");
-        }
-    }
 
-    RtcDateTime now = Rtc.GetDateTime();
-
-    displayTimeTemp(now,tem,hum);
-    
-    printDateTime(now);
+  if ((millis() - dhtTimeOut) > 60000){ // 1 min. 
     REMOTEXY__DEBUGLOGS.println();
-
-  RtcTemperature temp = Rtc.GetTemperature();
-  temp.Print(Serial);
-  // you may also get the temperature as a float and print it
+    hum = dht.readHumidity();    
+    tem = dht.readTemperature();
+    if (isnan(hum) && isnan(tem)) {
+        REMOTEXY__DEBUGLOGS.println("DHT failed");
+    } else {
+        REMOTEXY__DEBUGLOGS.print("Temperature: ");
+        REMOTEXY__DEBUGLOGS.print(tem,1);
+        REMOTEXY__DEBUGLOGS.print(" Humidity: ");
+        REMOTEXY__DEBUGLOGS.println(hum,1);        
+    }
+    RtcTemperature temp = Rtc.GetTemperature();
+   
+    temp.Print(Serial);
+    // you may also get the temperature as a float and print it
     // Serial.print(temp.AsFloatDegC());
     REMOTEXY__DEBUGLOGS.println("C");
+    dhtTimeOut = millis();
+  }
+  
+  if ((millis() - rtcTimeOut) > 30000){ // 30 sec.
+    REMOTEXY__DEBUGLOGS.println();
+    if (!Rtc.IsDateTimeValid()) 
+      {
+          if (Rtc.LastError() != 0)
+          {
+              // we have a communications error
+              // see https://www.arduino.cc/en/Reference/WireEndTransmission for 
+              // what the number means
+              REMOTEXY__DEBUGLOGS.print("RTC communications error = ");
+              REMOTEXY__DEBUGLOGS.println(Rtc.LastError());
+          }
+          else
+          {
+              // Common Causes:
+              //    1) the battery on the device is low or even missing and the power line was disconnected
+              REMOTEXY__DEBUGLOGS.println("RTC lost confidence in the DateTime!");
+          }
+      }
+  
+      RtcDateTime now = Rtc.GetDateTime();
+  
+      displayTimeTemp(now,tem,hum);
+      
+      printDateTime(now);
+      
+      rtcTimeOut = millis();
+    }
 
- 
-    delay(10000); // ten seconds
+    if (digitalRead(PIN_BUTTON)) {
+      if (!button) //подождем пока отпустишь
+        button = true;
+    } else {
+      if (button) {// дождались, отпустил
+        if (display_show){
+          display_show = 0;
+        } else {
+          display_show = 1;                    
+        }
+        displayTimeTemp(Rtc.GetDateTime(),tem,hum);
+        button = false;
+      }         
+    }
+    
+    
 }
 
 #define countof(a) (sizeof(a) / sizeof(a[0]))
 
 void displayTimeTemp(const RtcDateTime& dt,float tem,float hum){
   char datestring[7];
-  snprintf_P(datestring, 
-            countof(datestring),
-            PSTR("%02u:%02u"),
-            dt.Hour(),
-            dt.Minute()
-            );
   display.clearDisplay();
-  display.setCursor(0,0);
-  display.println(datestring);  
-
-  display.print(round(tem),0);
-  display.println(" c");
-  display.print(round(hum),0);
-  display.print(" %");
+  if (display_show){
+    snprintf_P(datestring, 
+              countof(datestring),
+              PSTR("%02u:%02u"),
+              dt.Hour(),
+              dt.Minute()
+              );
+   
+    display.setCursor(0,0);
+    display.println(datestring);  
   
+    display.print(round(tem),0);
+    display.println(" c");
+    display.print(round(hum),0);
+    display.print(" %");
+  }  
   display.display();        
 }
 
@@ -270,5 +337,26 @@ void printDateTime(const RtcDateTime& dt)
             dt.Hour(),
             dt.Minute(),
             dt.Second() );
-    REMOTEXY__DEBUGLOGS.print(datestring);
+    REMOTEXY__DEBUGLOGS.println(datestring);
+}
+
+boolean power(float diff){
+  int result;
+  if (diff < 0 || RemoteXY.switch_1 == 0){
+    digitalWrite(PIN_RELAY, LOW);
+    light = false;
+    digitalWrite(PIN_DIOD, light);
+    RemoteXY.led_1_r = 0;
+    result = false;
+  REMOTEXY__DEBUGLOGS.println("Power off.");
+  }
+  if (diff > 0 && RemoteXY.switch_1 != 0){
+    digitalWrite(PIN_RELAY, HIGH);
+    light = true;
+    digitalWrite(PIN_DIOD, light);
+    RemoteXY.led_1_r = 196;
+    result = true;
+  REMOTEXY__DEBUGLOGS.println("Power on!");
+  }  
+  return result;  
 }

@@ -200,6 +200,7 @@ void loop()
         diodBlinkOn = 50;
         diodBlinkOff = 3000;
       } 
+      relay = power(RemoteXY.T_min - tem_last);
             
 	  } else {
 	    RemoteXY.led_2_g = 128;
