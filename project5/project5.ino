@@ -27,8 +27,8 @@
 #include <RemoteXY.h>
 
 // настройки соединения 
-#define REMOTEXY_WIFI_SSID "viacheslavk"
-#define REMOTEXY_WIFI_PASSWORD "756235D394"
+#define REMOTEXY_WIFI_SSID "Keenetic" //"viacheslavk"
+#define REMOTEXY_WIFI_PASSWORD "9217424259" //"756235D394"
 #define REMOTEXY_CLOUD_SERVER "cloud.remotexy.com"
 #define REMOTEXY_CLOUD_PORT 6376
 #define REMOTEXY_CLOUD_TOKEN "b5d31bcb691d09e52ea3d3fc58c541ed"
