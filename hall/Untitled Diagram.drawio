@@ -1,6 +1,6 @@
-<mxfile host="app.diagrams.net" modified="2020-11-21T08:30:14.114Z" agent="5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.193 Safari/537.36" etag="03h7s9bCpDc22velFwSH" version="13.9.9" type="github">
+<mxfile host="app.diagrams.net" modified="2020-11-21T08:41:02.014Z" agent="5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.193 Safari/537.36" etag="8GPSdqD50YATb_L6zkTG" version="13.9.9" type="github">
   <diagram id="Ee9gzIk2O54lISuUMgik" name="Page-1">
-    <mxGraphModel dx="782" dy="529" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="3300" pageHeight="4681" background="none" math="0" shadow="0">
+    <mxGraphModel dx="782" dy="491" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="3300" pageHeight="4681" background="none" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -97,9 +97,11 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="l6jKR_ub78ht7T61pXSX-13" value="&lt;span style=&quot;color: rgb(64 , 64 , 64) ; font-family: &amp;#34;lato&amp;#34; , , &amp;#34;helvetica neue&amp;#34; , &amp;#34;arial&amp;#34; , sans-serif ; font-size: 16px ; background-color: rgb(252 , 252 , 252)&quot;&gt;5V BEC&lt;/span&gt;" style="whiteSpace=wrap;html=1;aspect=fixed;" vertex="1" parent="1">
-          <mxGeometry x="260" y="810" width="80" height="80" as="geometry" />
-        </mxCell>
+        <object label="&lt;span style=&quot;color: rgb(64 , 64 , 64) ; font-family: &amp;#34;lato&amp;#34; , , &amp;#34;helvetica neue&amp;#34; , &amp;#34;arial&amp;#34; , sans-serif ; font-size: 16px ; background-color: rgb(252 , 252 , 252)&quot;&gt;5V BEC&lt;/span&gt;" id="l6jKR_ub78ht7T61pXSX-13">
+          <mxCell style="whiteSpace=wrap;html=1;aspect=fixed;" vertex="1" parent="1">
+            <mxGeometry x="260" y="810" width="80" height="80" as="geometry" />
+          </mxCell>
+        </object>
         <mxCell id="l6jKR_ub78ht7T61pXSX-16" value="&lt;h1 class=&quot;product-title-text&quot; style=&quot;box-sizing: border-box ; padding: 0px ; margin: 0px ; font-size: 14px ; line-height: 19px ; font-weight: 500 ; font-family: &amp;#34;open sans&amp;#34; , sans-serif ; background-color: rgb(255 , 255 , 255)&quot;&gt;Pixhawk PX4 PIX 2.4.8&lt;/h1&gt;" style="shape=cube;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;darkOpacity=0.05;darkOpacity2=0.1;" vertex="1" parent="1">
           <mxGeometry x="390" y="640" width="120" height="200" as="geometry" />
         </mxCell>
