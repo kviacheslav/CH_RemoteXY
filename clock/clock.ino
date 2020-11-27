@@ -102,18 +102,23 @@ Adafruit_SSD1306 display(OLED_RESET);
 RtcDS3231<TwoWire> Rtc(Wire);
 
 #include <DHT.h>
-DHT dht(D5, DHT22); //
+DHT dht(D3, DHT22); // D3 or D4 it's exactly what the AM2302 needed, because this pin has built-in "pull up" 10kom on Wemos D1 mini
 
 #define PIN_RELAY D6 // relay
 #define PIN_DIOD D0
-#define PIN_BUTTON D8 // pull down on Wemos D1
+#define PIN_BUTTON D8 // D8 it's exactly what the Button needed, because this pin has built-in "pull down" 10kom on Wemos D1 mini 
+#define PIN_POT  A0 // potentiometer
 
 float tem;
 float hum;
 float set_tem;
 int tem_last;
 int hum_last;
-int change; 
+int change;
+int pot;
+int pot_last; 
+int pot_min;
+int pot_max;
 uint8_t power_on;
 uint8_t display_show = 1; // display time and temperatur
 uint8_t set_show = 0; // set time and date
@@ -128,6 +133,9 @@ uint32_t dhtTimeOut;
 uint32_t rtcTimeOut;
 uint32_t displayTimeOut;
 uint32_t setTimeOut;
+uint32_t potTimeOut;
+uint32_t unlockTimeOut;
+RtcDateTime now;
 
 void setup() 
 {
@@ -135,12 +143,18 @@ void setup()
   RemoteXY_Init ();   
   
   // TODO you setup code
-  setTimeOut = rtcTimeOut = dhtTimeOut = displayTimeOut = millis();
+  setTimeOut = rtcTimeOut = dhtTimeOut = displayTimeOut = potTimeOut = unlockTimeOut = millis();
   
   //--------PIN SETUP ------------
   pinMode(PIN_BUTTON, INPUT);
   pinMode (PIN_RELAY, OUTPUT);
   pinMode(PIN_DIOD, OUTPUT);
+  pinMode(PIN_POT, INPUT);
+  
+  //--------POT SETUP ------------
+  pot_min = 0;
+  pot_max = 25;
+  pot = pot_last = map(analogRead(PIN_POT), 0, 1023, pot_min, pot_max);
   
   //--------EEPROM SETUP ------------
   EEPROM.begin(4);
@@ -173,7 +187,7 @@ void setup()
    // See http://playground.arduino.cc/Main/I2cScanner how to test for a I2C device.
    display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
    display.display();
-   display.setTextSize(2);
+   display.setTextSize(1);
    display.setTextColor(WHITE);
  
 
@@ -224,7 +238,7 @@ void setup()
         Rtc.SetIsRunning(true);
     }
 
-    RtcDateTime now = Rtc.GetDateTime();
+    now = Rtc.GetDateTime();
     if (now < compiled) 
     {
         REMOTEXY__DEBUGLOGS.println("RTC is older than compile time!  (Updating DateTime)");
@@ -255,6 +269,21 @@ void loop()
   // TODO you loop code
   // используйте структуру RemoteXY для передачи данных
   // не используйте функцию delay() 
+  if (RemoteXY.switch_1 != power_on){
+    power_on = RemoteXY.switch_1;
+    EEPROM.write(2, power_on);
+    EEPROM.commit();
+    relay = power(RemoteXY.T_min - tem_last);
+    displayTimeTemp(now,tem,hum);
+  }
+  if (RemoteXY.T_min != set_tem){
+    set_tem = RemoteXY.T_min;
+    EEPROM.write(0, (int)set_tem);
+    EEPROM.write(1, (set_tem-(int)set_tem)*10);   
+    EEPROM.commit();
+    relay = power(RemoteXY.T_min - tem_last);
+    displayTimeTemp(now,tem,hum);
+  }
 
   if ((millis() - dhtTimeOut) > 60000){ // 1 min. 
     REMOTEXY__DEBUGLOGS.println();
@@ -268,11 +297,14 @@ void loop()
         REMOTEXY__DEBUGLOGS.print(tem,1);
         REMOTEXY__DEBUGLOGS.print(" Humidity: ");
         REMOTEXY__DEBUGLOGS.println(hum,1);
+        if (tem_last != tem){
+          relay = power(RemoteXY.T_min - tem);
+          displayTimeTemp(now,tem,hum);
+        } 
         hum_last = hum;
         tem_last = tem;
         RemoteXY.led_2_g = 128;        
-    }
-    relay = power(RemoteXY.T_min - tem_last);
+    }    
     RtcTemperature temp = Rtc.GetTemperature();   
     temp.Print(REMOTEXY__DEBUGLOGS);
     // you may also get the temperature as a float and print it
@@ -305,7 +337,7 @@ void loop()
           }
       }
   
-      RtcDateTime now = Rtc.GetDateTime();
+      now = Rtc.GetDateTime();
   
       displayTimeTemp(now,tem,hum);
       
@@ -315,17 +347,29 @@ void loop()
     }
     
     if (digitalRead(PIN_BUTTON)) {
-      if (!button) //подождем пока отпустишь
+      if (!button){ //подождем пока отпустишь
         button = true;
+        unlockTimeOut = millis();
+        REMOTEXY__DEBUGLOGS.println("press");        
+      }
+      else {
+        if ((millis() - unlockTimeOut) > 5000) { // жмем больше 5 сек
+          RemoteXY.switch_1 = RemoteXY.switch_1 ^ 1; // разблокировка|блокировка
+          unlockTimeOut = millis();
+        }        
+      }
     } else {
       if (button) {// дождались, отпустил
-        if (display_show){
-          display_show = 0;
-        } else {
-          display_show = 1;                    
-        }
-        displayTimeTemp(Rtc.GetDateTime(),tem,hum);
+        if ((millis() - unlockTimeOut) > 1500) { // не дребезг
+            if (display_show){
+              display_show = 0;
+            } else {
+              display_show = 1;                    
+            }
+            displayTimeTemp(now,tem,hum);
+        }               
         button = false;
+        REMOTEXY__DEBUGLOGS.println("unpress");
       }         
     } 
     if (RemoteXY.button_set){
@@ -362,13 +406,23 @@ void loop()
             decrement_press = false; 
             change = 0;
           }                       
-    }   
-
+    }
 
     if ((millis() - setTimeOut) > 1000) {        
       setTimeDate(Rtc.GetDateTime(), set_show, set, change); 
       set = !set;
-      setTimeOut = millis();
+      setTimeOut = millis();      
+    }
+
+    if ((millis() - potTimeOut) > 1000) {  
+      pot = map(analogRead(PIN_POT), 0, 1023, pot_min, pot_max);
+      //REMOTEXY__DEBUGLOGS.print("POT = ");
+      //REMOTEXY__DEBUGLOGS.println(pot);
+      if (pot != pot_last){
+        RemoteXY.T_min = pot;                              
+      }
+      pot_last = pot;      
+      potTimeOut = millis();      
     }
     
     
@@ -469,12 +523,27 @@ void displayTimeTemp(const RtcDateTime& dt,float tem,float hum){
               );
    
     display.setCursor(0,0);
+    display.setTextSize(4);
     display.println(datestring);  
-  
+    display.setTextSize(2);
     display.print(round(tem),0);
-    display.println(" c");
+    display.print("-");
+    display.print(round(RemoteXY.T_min),0);
+    display.setTextSize(1);
+    display.print("c");
+    display.setTextSize(2);
+    if (relay)
+      display.print(" ON");
+    else
+      display.print(" off");
+    display.println("");
     display.print(round(hum),0);
-    display.print(" %");
+    display.setTextSize(1);
+    display.print("%");  
+    display.setTextSize(2);
+    if (RemoteXY.switch_1 == 0)
+      display.print("   lock");
+    
   }  
   display.display();        
 }
@@ -495,7 +564,7 @@ void printDateTime(const RtcDateTime& dt)
     REMOTEXY__DEBUGLOGS.println(datestring);
 }
 
-boolean power(float diff){
+boolean power(int diff){
   int result;
   if (diff < 0 || RemoteXY.switch_1 == 0){
     digitalWrite(PIN_RELAY, LOW);
