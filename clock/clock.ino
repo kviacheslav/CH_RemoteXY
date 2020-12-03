@@ -122,6 +122,9 @@ int pot_max;
 uint8_t power_on;
 uint8_t display_show = 1; // display time and temperatur
 uint8_t set_show = 0; // set time and date
+uint8_t radiator_m = 0; // 
+uint8_t radiator_h = 0; //
+uint8_t radiator_d = 0; // 
 boolean relay = false;    // relay off, true - on
 boolean set = true;     // set blink, false - pause
 boolean set_press = false;     // press , false - unpress
@@ -135,6 +138,9 @@ uint32_t displayTimeOut;
 uint32_t setTimeOut;
 uint32_t potTimeOut;
 uint32_t unlockTimeOut;
+uint32_t radiator_on;
+uint32_t radiatorTimeOut;
+
 RtcDateTime now;
 
 void setup() 
@@ -143,7 +149,7 @@ void setup()
   RemoteXY_Init ();   
   
   // TODO you setup code
-  setTimeOut = rtcTimeOut = dhtTimeOut = displayTimeOut = potTimeOut = unlockTimeOut = millis();
+  setTimeOut = rtcTimeOut = dhtTimeOut = displayTimeOut = potTimeOut = unlockTimeOut = radiatorTimeOut = millis();
   
   //--------PIN SETUP ------------
   pinMode(PIN_BUTTON, INPUT);
@@ -157,12 +163,19 @@ void setup()
   pot = pot_last = map(analogRead(PIN_POT), 0, 1023, pot_min, pot_max);
   
   //--------EEPROM SETUP ------------
-  EEPROM.begin(4);
+  EEPROM.begin(8);
   set_tem = EEPROM.read(0)*10 + EEPROM.read(1);
   set_tem /= 10;
   power_on = EEPROM.read(2);
   RemoteXY.T_min = set_tem;
   RemoteXY.switch_1 = power_on;
+  radiator_d = EEPROM.read(3);
+  if (radiator_d == 255)
+    radiator_d = 0;
+  radiator_h = EEPROM.read(4);
+   if (radiator_h == 255)
+    radiator_h = 0;
+  radiator_m = EEPROM.read(5);
 
   //--------DHT SETUP ------------  
   dht.begin();
@@ -179,7 +192,10 @@ void setup()
   }
   RemoteXY.level_H = hum_last;
   RemoteXY.level_T = tem_last + 50;
-     
+
+  //--------RELAY SETUP ------------
+  power(RemoteXY.T_min - tem_last);
+  
   
  // RemoteXY.sound_1 = 0;
    REMOTEXY__DEBUGLOGS.println("");
@@ -273,7 +289,7 @@ void loop()
     power_on = RemoteXY.switch_1;
     EEPROM.write(2, power_on);
     EEPROM.commit();
-    relay = power(RemoteXY.T_min - tem_last);
+    power(RemoteXY.T_min - tem_last);
     displayTimeTemp(now,tem,hum);
   }
   if (RemoteXY.T_min != set_tem){
@@ -281,7 +297,7 @@ void loop()
     EEPROM.write(0, (int)set_tem);
     EEPROM.write(1, (set_tem-(int)set_tem)*10);   
     EEPROM.commit();
-    relay = power(RemoteXY.T_min - tem_last);
+    power(RemoteXY.T_min - tem_last);
     displayTimeTemp(now,tem,hum);
   }
 
@@ -298,7 +314,7 @@ void loop()
         REMOTEXY__DEBUGLOGS.print(" Humidity: ");
         REMOTEXY__DEBUGLOGS.println(hum,1);
         if (tem_last != tem){
-          relay = power(RemoteXY.T_min - tem);
+          power(RemoteXY.T_min - tem);
           displayTimeTemp(now,tem,hum);
         } 
         hum_last = hum;
@@ -355,6 +371,7 @@ void loop()
       else {
         if ((millis() - unlockTimeOut) > 5000) { // жмем больше 5 сек
           RemoteXY.switch_1 = RemoteXY.switch_1 ^ 1; // разблокировка|блокировка
+          RemoteXY_sendInputVariables ();
           unlockTimeOut = millis();
         }        
       }
@@ -419,10 +436,29 @@ void loop()
       //REMOTEXY__DEBUGLOGS.print("POT = ");
       //REMOTEXY__DEBUGLOGS.println(pot);
       if (pot != pot_last){
-        RemoteXY.T_min = pot;                              
+        RemoteXY.T_min = pot;
+        RemoteXY_sendInputVariables ();                              
       }
       pot_last = pot;      
       potTimeOut = millis();      
+    }
+    
+    if ((millis() - radiatorTimeOut) > 60000) {
+      if (relay){
+        if (++radiator_m > 59){
+          radiator_m = 0;        
+          if (++radiator_h > 23){
+            radiator_h = 0;
+            ++radiator_d;
+          }
+        }    
+        EEPROM.write(3, radiator_d);
+        EEPROM.write(4, radiator_h);
+        EEPROM.write(5, radiator_m);   
+        EEPROM.commit();                     
+      }      
+      printRadiator();     
+      radiatorTimeOut = millis();    
     }
     
     
@@ -564,23 +600,64 @@ void printDateTime(const RtcDateTime& dt)
     REMOTEXY__DEBUGLOGS.println(datestring);
 }
 
-boolean power(int diff){
-  int result;
+void printRadiator(){
+  unsigned long sec_;
+  unsigned int day_;
+  unsigned long rem_;
+  unsigned int hou_;
+  unsigned int min_;
+  String strDay;             // day works 
+  String strHou;
+  String strMin;
+  String strSec;
+  String str;
+
+  if (relay){
+    sec_ = (millis() - radiator_on) / 1000;
+    day_ = sec_ / 86400;
+    rem_ = sec_ % 86400;
+    hou_ = rem_ / 3600;
+    rem_ = rem_ % 3600;
+    min_ = rem_ / 60;
+    rem_ = rem_ % 60;
+    strDay = String(day_, DEC) + "d ";
+    strHou = String(hou_, DEC) + "h ";
+    strMin = String(min_, DEC) + "m "; 
+    strSec = String(rem_, DEC) + "s ";
+    str = strDay + strHou + strMin;                  
+  }
+  else {
+    str = "off ";
+  }
+  str += "total:";
+  str += String(radiator_d, DEC) + "d ";
+  str += String(radiator_h, DEC) + "h ";
+  str += String(radiator_m, DEC) + "m ";       
+  str.toCharArray(RemoteXY.text_1,40);
+ REMOTEXY__DEBUGLOGS.println("");
+ REMOTEXY__DEBUGLOGS.println(str);   
+}
+
+void power(int diff){
   if (diff < 0 || RemoteXY.switch_1 == 0){
     digitalWrite(PIN_RELAY, LOW);
     light = false;
     digitalWrite(PIN_DIOD, light);
     RemoteXY.led_1_r = 0;
-    result = false;
+    relay = false;
+    radiator_on = 0;
   REMOTEXY__DEBUGLOGS.println("Power off.");
   }
   if (diff > 0 && RemoteXY.switch_1 != 0){
     digitalWrite(PIN_RELAY, HIGH);
-    light = true;
-    digitalWrite(PIN_DIOD, light);
-    RemoteXY.led_1_r = 196;
-    result = true;
+    if (!light){
+      radiator_on = radiatorTimeOut = millis();
+      light = true;
+      digitalWrite(PIN_DIOD, light);
+      RemoteXY.led_1_r = 196;
+    }
+    relay = true;
   REMOTEXY__DEBUGLOGS.println("Power on!");
   }  
-  return result;  
+  printRadiator();
 }
