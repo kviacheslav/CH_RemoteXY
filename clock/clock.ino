@@ -28,8 +28,8 @@
 #include <RemoteXY.h>
 
 // настройки соединения 
-#define REMOTEXY_WIFI_SSID "viacheslavk"
-#define REMOTEXY_WIFI_PASSWORD "756235D394"
+#define REMOTEXY_WIFI_SSID "Keenetic" // "xiaomi-plc-v1_miap21ca_plus" //"viacheslavk"
+#define REMOTEXY_WIFI_PASSWORD "9217424259" //"Ac2694058"//"756235D394"
 #define REMOTEXY_CLOUD_SERVER "cloud.remotexy.com"
 #define REMOTEXY_CLOUD_PORT 6376
 #define REMOTEXY_CLOUD_TOKEN "2042b321e1648a82eb2be11e1436674e" //"2042b321e1648a82eb2be11e1436674e"
