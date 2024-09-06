@@ -21,14 +21,21 @@
 //////////////////////////////////////////////
 
 // определение режима соединения и подключение библиотеки RemoteXY 
+//#define REMOTEXY__DEBUGLOG
 #define REMOTEXY__DEBUGLOGS Serial
+#define REMOTEXY__DEBUGLOGS_SPEED 115200
 #define REMOTEXY_MODE__ESP8266WIFI_LIB_CLOUD
+#include <NTPClient.h>
 #include <ESP8266WiFi.h>
+#include <WiFiUdp.h>
+
+WiFiUDP ntpUDP;
+NTPClient timeClient(ntpUDP);
 
 #include <RemoteXY.h>
 
 // настройки соединения 
-#define REMOTEXY_WIFI_SSID "Keenetic" // "xiaomi-plc-v1_miap21ca_plus" //"viacheslavk"
+#define REMOTEXY_WIFI_SSID "Keenetic-1712" // "xiaomi-plc-v1_miap21ca_plus" //"viacheslavk"
 #define REMOTEXY_WIFI_PASSWORD "9217424259" //"Ac2694058"//"756235D394"
 #define REMOTEXY_CLOUD_SERVER "cloud.remotexy.com"
 #define REMOTEXY_CLOUD_PORT 6376
@@ -90,14 +97,17 @@ struct {
 /*
   Добавляем необходимые библиотеки
 */
+#include <Wire.h>
 #include <Adafruit_GFX.h>
 #include "Adafruit_SSD1306.h"
+#define SCREEN_WIDTH 128 // OLED display width, in pixels
+#define SCREEN_HEIGHT 64 // OLED display height, in pixels
 #define OLED_RESET -1
-Adafruit_SSD1306 display(OLED_RESET);
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 #include <EEPROM.h>
 
-#include <Wire.h> // must be included here so that Arduino library object file references work
+//#include <Wire.h> // must be included here so that Arduino library object file references work
 #include <RtcDS3231.h>
 RtcDS3231<TwoWire> Rtc(Wire);
 
@@ -144,7 +154,9 @@ uint32_t radiatorTimeOut;
 RtcDateTime now;
 
 void setup() 
-{
+{ 
+  REMOTEXY__DEBUGLOGS.begin(REMOTEXY__DEBUGLOGS_SPEED);
+  REMOTEXY__DEBUGLOGS.println("***");
   int error;
   RemoteXY_Init ();   
   
@@ -183,7 +195,7 @@ void setup()
   tem = dht.readTemperature();
   if (isnan(hum) && isnan(tem)){
       hum_last = 0;
-      tem_last = 0;
+      tem_last = -50;
       RemoteXY.led_2_g = 0;
   } else {
       hum_last = hum;
@@ -198,7 +210,7 @@ void setup()
   
   
  // RemoteXY.sound_1 = 0;
-   REMOTEXY__DEBUGLOGS.println("");
+ 
    //--------Display SETUP ------------
    // See http://playground.arduino.cc/Main/I2cScanner how to test for a I2C device.
    display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
@@ -244,7 +256,7 @@ void setup()
             // it will also reset the valid flag internally unless the Rtc device is
             // having an issue
 
-            Rtc.SetDateTime(compiled);
+            //Rtc.SetDateTime(compiled);
         }
     }
 
@@ -273,6 +285,9 @@ void setup()
     // just clear them to your needed state
     Rtc.Enable32kHzPin(false);
     Rtc.SetSquareWavePin(DS3231SquareWavePin_ModeNone); 
+
+    timeClient.begin();
+    timeClient.setTimeOffset(10800);
  
 }
 
@@ -305,28 +320,35 @@ void loop()
     REMOTEXY__DEBUGLOGS.println();
     hum = dht.readHumidity();    
     tem = dht.readTemperature();
-    if (isnan(hum) && isnan(tem)) {
-        REMOTEXY__DEBUGLOGS.println("DHT failed"); 
-        RemoteXY.led_2_g = 0;       
+    if (isnan(hum) || isnan(tem)) {
+      REMOTEXY__DEBUGLOGS.println("DHT failed"); 
+      RemoteXY.led_2_g = 0;       
     } else {
-        REMOTEXY__DEBUGLOGS.print("Temperature: ");
-        REMOTEXY__DEBUGLOGS.print(tem,1);
-        REMOTEXY__DEBUGLOGS.print(" Humidity: ");
-        REMOTEXY__DEBUGLOGS.println(hum,1);
-        if (tem_last != tem){
-          power(RemoteXY.T_min - tem);
-          displayTimeTemp(now,tem,hum);
-        } 
-        hum_last = hum;
-        tem_last = tem;
-        RemoteXY.led_2_g = 128;        
-    }    
-    RtcTemperature temp = Rtc.GetTemperature();   
-    temp.Print(REMOTEXY__DEBUGLOGS);
-    // you may also get the temperature as a float and print it
-    // Serial.print(temp.AsFloatDegC());
-    REMOTEXY__DEBUGLOGS.println("C");
+      RemoteXY.led_2_g = 128; 
+    }
+    if (isnan(tem)) {
+      RtcTemperature temp = Rtc.GetTemperature(); 
+      tem = temp.AsFloatDegC();
+      REMOTEXY__DEBUGLOGS.print("Temperature from RTC: ");              
+    } else {
+      REMOTEXY__DEBUGLOGS.print("Temperature from DHT: ");
+    }
+    if (isnan(hum)) {
+      hum = 0;
+    }
     
+    REMOTEXY__DEBUGLOGS.print(tem,1);
+    REMOTEXY__DEBUGLOGS.print(" Humidity: ");
+    REMOTEXY__DEBUGLOGS.println(hum,1);
+    
+    if (tem_last != tem){
+      power(RemoteXY.T_min - tem);
+      displayTimeTemp(now,tem,hum);
+    } 
+    hum_last = hum;
+    tem_last = tem;          
+        
+        
     RemoteXY.level_H = hum_last;
     RemoteXY.level_T = tem_last + 50;
        
@@ -353,12 +375,21 @@ void loop()
           }
       }
   
-      now = Rtc.GetDateTime();
-  
+      now = Rtc.GetDateTime();  
       displayTimeTemp(now,tem,hum);
-      
+      REMOTEXY__DEBUGLOGS.print("rtc: ");
       printDateTime(now);
       
+      RtcDateTime dt = RtcDateTime(__DATE__, __TIME__);
+      REMOTEXY__DEBUGLOGS.print("compiled: ");
+      printDateTime(dt); 
+          
+      timeClient.update();      
+      RtcDateTime dti = RtcDateTime();
+      dti.InitWithUnix64Time(timeClient.getEpochTime());
+      REMOTEXY__DEBUGLOGS.print("ntp: ");    
+      printDateTime(dti);
+
       rtcTimeOut = millis();
     }
     
@@ -371,7 +402,7 @@ void loop()
       else {
         if ((millis() - unlockTimeOut) > 5000) { // жмем больше 5 сек
           RemoteXY.switch_1 = RemoteXY.switch_1 ^ 1; // разблокировка|блокировка
-          RemoteXY_sendInputVariables ();
+          //RemoteXY_sendInputVariables ();
           unlockTimeOut = millis();
         }        
       }
@@ -437,7 +468,7 @@ void loop()
       //REMOTEXY__DEBUGLOGS.println(pot);
       if (pot != pot_last){
         RemoteXY.T_min = pot;
-        RemoteXY_sendInputVariables ();                              
+        //RemoteXY_sendInputVariables ();                              
       }
       pot_last = pot;      
       potTimeOut = millis();      
@@ -520,15 +551,42 @@ void setTimeDate(const RtcDateTime& dt, uint8_t set_show, boolean set, int chang
             if (set)
               RemoteXY.TimeM[0] = RemoteXY.TimeM[1] = '_';  
             break; 
-          case 3: 
+          case 3:
+           if(change > 0){
+              if (++day > 31)
+                day = 1;
+            } else {
+              if (day == 1)
+                day = 31;
+              else
+               --day;                
+            } 
            if (set)
               RemoteXY.Date[0] = RemoteXY.Date[1] = '_';  
            break; 
           case 4:
+            if(change > 0){
+              if (++month > 12)
+                month = 1;
+            } else {
+              if (month == 1)
+                month = 12;
+              else
+               --month;                
+            }
             if (set)
               RemoteXY.Date[3] = RemoteXY.Date[4] = '_';
             break; 
           case 5:
+            if(change > 0){
+              if (++year > 2050)
+                year = 2023;
+            } else {
+              if (year == 2024)
+                year = 2050;
+              else
+               --year;                
+            }
             if (set)
               RemoteXY.Date[6] = RemoteXY.Date[7] = RemoteXY.Date[8] = RemoteXY.Date[9] ='_'; 
             break;      
@@ -581,7 +639,8 @@ void displayTimeTemp(const RtcDateTime& dt,float tem,float hum){
       display.print("   lock");
     
   }  
-  display.display();        
+  display.display(); 
+        
 }
 
 void printDateTime(const RtcDateTime& dt)
