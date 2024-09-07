@@ -35,7 +35,7 @@ NTPClient timeClient(ntpUDP);
 #include <RemoteXY.h>
 
 // настройки соединения 
-#define REMOTEXY_WIFI_SSID "Keenetic-1712" // "xiaomi-plc-v1_miap21ca_plus" //"viacheslavk"
+#define REMOTEXY_WIFI_SSID "Keenetic" // "xiaomi-plc-v1_miap21ca_plus" //"viacheslavk"
 #define REMOTEXY_WIFI_PASSWORD "9217424259" //"Ac2694058"//"756235D394"
 #define REMOTEXY_CLOUD_SERVER "cloud.remotexy.com"
 #define REMOTEXY_CLOUD_PORT 6376
@@ -355,43 +355,44 @@ void loop()
     dhtTimeOut = millis();
   }
   
-  if ((millis() - rtcTimeOut) > 30000){ // 30 sec.
+  if ((millis() - rtcTimeOut) > 30000) { // 30 sec.
     REMOTEXY__DEBUGLOGS.println();
-    if (!Rtc.IsDateTimeValid()) 
-      {
-          if (Rtc.LastError() != 0)
-          {
-              // we have a communications error
-              // see https://www.arduino.cc/en/Reference/WireEndTransmission for 
-              // what the number means
-              REMOTEXY__DEBUGLOGS.print("RTC communications error = ");
-              REMOTEXY__DEBUGLOGS.println(Rtc.LastError());
-          }
-          else
-          {
-              // Common Causes:
-              //    1) the battery on the device is low or even missing and the power line was disconnected
-              REMOTEXY__DEBUGLOGS.println("RTC lost confidence in the DateTime!");
+    if (!Rtc.IsDateTimeValid()) {
+      if (Rtc.LastError() != 0) {
+          // we have a communications error
+          // see https://www.arduino.cc/en/Reference/WireEndTransmission for 
+          // what the number means
+          REMOTEXY__DEBUGLOGS.print("RTC communications error = ");
+          REMOTEXY__DEBUGLOGS.println(Rtc.LastError());
+      } else {
+          // Common Causes:
+          //    1) the battery on the device is low or even missing and the power line was disconnected
+          REMOTEXY__DEBUGLOGS.println("RTC lost confidence in the DateTime!");
+          timeClient.update(); 
+          REMOTEXY__DEBUGLOGS.print("ntp: ");
+          if (timeClient.isTimeSet() ) {   
+            RtcDateTime dti = RtcDateTime();
+            dti.InitWithUnix64Time(timeClient.getEpochTime());  
+            REMOTEXY__DEBUGLOGS.print("Synch DateTime ");          
+            printDateTime(dti);            
+            Rtc.SetDateTime(dti);
+          } else {
+            REMOTEXY__DEBUGLOGS.println(" not time set");
           }
       }
-  
-      now = Rtc.GetDateTime();  
-      displayTimeTemp(now,tem,hum);
-      REMOTEXY__DEBUGLOGS.print("rtc: ");
-      printDateTime(now);
-      
-      RtcDateTime dt = RtcDateTime(__DATE__, __TIME__);
-      REMOTEXY__DEBUGLOGS.print("compiled: ");
-      printDateTime(dt); 
-          
-      timeClient.update();      
-      RtcDateTime dti = RtcDateTime();
-      dti.InitWithUnix64Time(timeClient.getEpochTime());
-      REMOTEXY__DEBUGLOGS.print("ntp: ");    
-      printDateTime(dti);
-
-      rtcTimeOut = millis();
     }
+  
+    now = Rtc.GetDateTime();  
+    
+    REMOTEXY__DEBUGLOGS.print("rtc: ");
+    printDateTime(now);    
+    RtcDateTime dt = RtcDateTime(__DATE__, __TIME__);
+    REMOTEXY__DEBUGLOGS.print("compiled: ");
+    printDateTime(dt); 
+
+    displayTimeTemp(now,tem,hum);    
+    rtcTimeOut = millis();
+  }
     
     if (digitalRead(PIN_BUTTON)) {
       if (!button){ //подождем пока отпустишь
